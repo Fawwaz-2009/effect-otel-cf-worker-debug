@@ -1,0 +1,3 @@
+OTEL_EXPORTER_OTLP_ENDPOINT=example.com
+OTEL_EXPORTER_API_KEY=example-api-key
+APP_NAME_OTL=example-app-name

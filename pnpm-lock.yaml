@@ -53,6 +53,9 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: ^1.32.0
         version: 1.32.0
+      dotenv:
+        specifier: ^16.5.0
+        version: 16.5.0
       effect:
         specifier: ^3.14.8
         version: 3.14.8
@@ -1309,6 +1312,10 @@ packages:
 
   devalue@4.3.3:
     resolution: {integrity: sha512-UH8EL6H2ifcY8TbD2QsxwCC/pr5xSwPvv85LrLXVihmHVC3T3YqTCIwnR5ak0yO1KYqlxrPVOA/JVZJYPy2ATg==}
+
+  dotenv@16.5.0:
+    resolution: {integrity: sha512-m/C+AwOAr9/W1UOIZUo232ejMNnJAJtYQjUbHoNTBNTJSvqzzDh7vnrei3o3r3m9blf6ZoDkvcw0VmozNRFJxg==}
+    engines: {node: '>=12'}
 
   effect@3.14.8:
     resolution: {integrity: sha512-cHV6Mc2gb1e6l+CxhCeZm1JOzE4C9Mp7MhqHNFuAcSds2c2f23ZAb1ef4gBRHMIcdJ5sr3KGm+Xn+4z/UByE8w==}
@@ -2727,6 +2734,8 @@ snapshots:
     optional: true
 
   devalue@4.3.3: {}
+
+  dotenv@16.5.0: {}
 
   effect@3.14.8:
     dependencies:
