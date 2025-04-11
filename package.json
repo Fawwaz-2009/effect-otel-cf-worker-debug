@@ -1,5 +1,5 @@
 {
-	"name": "my-first-worker",
+	"name": "effect-otel-cf-worker-debug",
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
