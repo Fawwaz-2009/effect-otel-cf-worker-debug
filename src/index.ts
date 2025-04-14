@@ -11,34 +11,25 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 import * as OtlpTracer from '@effect/opentelemetry/OtlpTracer';
-import { NodeHttpClient, NodeRuntime } from '@effect/platform-node';
+import { FetchHttpClient } from '@effect/platform';
 import { Effect, Layer } from 'effect';
+import { program, failingProgram } from './program';
 
 const Tracing = OtlpTracer.layer({
 	url: 'http://localhost:4318/v1/traces',
 	resource: {
 		serviceName: 'my-service',
 	},
-}).pipe(Layer.provide(NodeHttpClient.layerUndici));
-
-const program = Effect.log('Hello').pipe(
-	Effect.withSpan('c'),
-	Effect.withSpan('b'),
-	Effect.withSpan('a'),
-	Effect.repeatN(3),
-	Effect.annotateSpans('working', true)
-);
-
-const failingProgram = Effect.fail(new Error('Failing program')).pipe(Effect.withSpan('d'));
+}).pipe(Layer.provide(FetchHttpClient.layer));
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
-		const res = await program.pipe(
+		const runnable = program.pipe(
 			Effect.andThen(failingProgram),
 			Effect.provide(Tracing),
 			Effect.catchAllCause(Effect.logError),
-			NodeRuntime.runMain
 		);
+		await Effect.runPromise(runnable);
 
 		return new Response(null, { status: 200 });
 	},

@@ -1,67 +1,20 @@
-import { Effect } from 'effect';
-import { NodeSdk } from '@effect/opentelemetry';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import * as dotenv from 'dotenv';
+import { Effect, Layer } from 'effect';
+import * as OtlpTracer from '@effect/opentelemetry/OtlpTracer';
+import { FetchHttpClient } from '@effect/platform';
+import { program, failingProgram } from './program'; 
 
-dotenv.config({
-	path: '.dev.vars',
-});
+const TracingLive = OtlpTracer.layer({
+	url: 'http://localhost:4318/v1/traces',
+	resource: {
+		serviceName: 'my-node-service', 
+	},
+}).pipe(Layer.provide(FetchHttpClient.layer));
 
-if (!process.env.APP_NAME_OTL || !process.env.OTEL_EXPORTER_OTLP_ENDPOINT || !process.env.OTEL_EXPORTER_API_KEY) {
-	throw new Error('Missing environment variables');
-}
+const runnable = program.pipe(
+	Effect.andThen(failingProgram),
+	Effect.provide(TracingLive),
+	Effect.catchAllCause(Effect.logError)
+);
 
-// Function to simulate a task with possible subtasks
-const task = (name: string, delay: number, children: ReadonlyArray<Effect.Effect<void>> = []) =>
-	Effect.gen(function* () {
-		yield* Effect.log(name);
-		yield* Effect.sleep(`${delay} millis`);
-		for (const child of children) {
-			yield* child;
-		}
-		yield* Effect.sleep(`${delay} millis`);
-	}).pipe(Effect.withSpan(name));
+Effect.runPromise(runnable);
 
-const poll = task('/poll', 1);
-
-// Create a program with tasks and subtasks
-export const program = task('client', 2, [
-	task('/api', 3, [
-		task('/authN', 4, [task('/authZ', 5)]),
-		task('/payment Gateway', 6, [task('DB', 7), task('Ext. Merchant', 8)]),
-		task('/dispatch', 9, [
-			task('/dispatch/search', 10),
-			Effect.all([poll, poll, poll], { concurrency: 'inherit' }),
-			task('/pollDriver/{id}', 11),
-		]),
-	]),
-]);
-
-const NodeSdkLive = NodeSdk.layer(() => ({
-	resource: { serviceName: process.env.APP_NAME_OTL! },
-	spanProcessor: new BatchSpanProcessor(
-		new OTLPTraceExporter({
-			url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
-			headers: { 'x-api-key': process.env.OTEL_EXPORTER_API_KEY! },
-		})
-	),
-}));
-
-Effect.runPromise(program.pipe(Effect.provide(NodeSdkLive), Effect.catchAllCause(Effect.logError)));
-/*
-Output:
-timestamp=... level=INFO fiber=#0 message=client
-timestamp=... level=INFO fiber=#0 message=/api
-timestamp=... level=INFO fiber=#0 message=/authN
-timestamp=... level=INFO fiber=#0 message=/authZ
-timestamp=... level=INFO fiber=#0 message="/payment Gateway"
-timestamp=... level=INFO fiber=#0 message=DB
-timestamp=... level=INFO fiber=#0 message="Ext. Merchant"
-timestamp=... level=INFO fiber=#0 message=/dispatch
-timestamp=... level=INFO fiber=#0 message=/dispatch/search
-timestamp=... level=INFO fiber=#3 message=/poll
-timestamp=... level=INFO fiber=#4 message=/poll
-timestamp=... level=INFO fiber=#5 message=/poll
-timestamp=... level=INFO fiber=#0 message=/pollDriver/{id}
-*/

@@ -1,59 +1,64 @@
-# Effect.ts OpenTelemetry Cloudflare Worker Debugging
+# Effect & OpenTelemetry Debugging with Cloudflare Worker
 
-This repository contains test cases to debug why Effect.ts with OpenTelemetry integration works in a regular Node.js environment but fails to send telemetry data when running in a Cloudflare Worker environment.
+This repository provides a minimal reproduction case to debug an issue with sending OpenTelemetry (OTEL) traces from an Effect application running inside a Cloudflare Worker.
+
+## The Issue
+
+We have two implementations:
+- A regular Node.js app (`src/regular-node.ts`) that sends traces correctly.
+- A Cloudflare Worker app (`src/index.ts`) that sends traces but does **not appear** in Grafana, despite reaching the OTLP collector.
+
+Both applications use the same setup (`@effect/opentelemetry`). The issue seems specific to traces originating from within Cloudflare Workers.
 
 ## Project Structure
 
-- `src/regular-node.ts`: A working example of Effect.ts with OpenTelemetry in a Node.js environment
-- `src/index.ts`: The Cloudflare Worker implementation with the same telemetry setup
-- `.dev.vars.example`: Example environment variables needed for both implementations
+- `src/regular-node.ts`: Working Node.js example.
+- `src/index.ts`: Cloudflare Worker example with the issue.
 
-## Setup
+## Quick Setup
 
-1. Install dependencies:
+1. **Start Grafana LGTM Stack** (Grafana + OTLP Collector)
+
+```bash
+docker run -p 3000:3000 -p 4317:4317 -p 4318:4318 --rm -it -e ENABLE_LOGS_OTELCOL=true --name otel-lgtm docker.io/grafana/otel-lgtm
+```
+
+Grafana available at: `http://localhost:3000`
+
+2. **Install dependencies**
+
 ```bash
 pnpm install
 ```
 
-2. Create a `.dev.vars` file based on the example:
-```bash
-cp .dev.vars.example .dev.vars
-```
+3. **Run the working Node.js example**
 
-3. Update the `.dev.vars` file with your actual OpenTelemetry configuration:
-```
-OTEL_EXPORTER_OTLP_ENDPOINT=your-endpoint
-OTEL_EXPORTER_API_KEY=your-api-key
-APP_NAME_OTL=your-app-name
-```
-
-> **Note**: The OpenTelemetry configuration values (`OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_EXPORTER_API_KEY`) will depend on your specific OTEL Collector setup and the destination where you want to send the telemetry data (e.g., Grafana, Jaeger, etc.). Make sure to use the correct endpoint and authentication details for your telemetry pipeline.
-
-## Testing
-
-### Node.js Environment (Working Example)
-
-To run the working Node.js example:
 ```bash
 pnpm exec tsx src/regular-node.ts
 ```
 
-This implementation successfully sends telemetry data to your Grafana dashboard.
+- Check Grafana dashboard; traces will appear correctly.
 
-### Cloudflare Worker Environment (Debugging)
+4. **Run the problematic Cloudflare Worker**
 
-To run the Cloudflare Worker locally:
 ```bash
 pnpm run dev
 ```
 
-The worker will be available at http://localhost:8787
+- Cloudflare Worker available at: `http://localhost:8787`
+- Trigger the worker via browser or `curl`.
 
-## Debugging Context
+## Observations & Debugging Tips
 
-The repository contains two implementations of the same telemetry setup:
-1. A Node.js version that works correctly
-2. A Cloudflare Worker version that currently fails to send telemetry data
+- Confirm outgoing OTLP traces:
 
-The goal is to identify why the telemetry data doesn't reach Grafana when running in the Cloudflare Worker environment, while it works perfectly in the Node.js environment.
+```bash
+sudo tcpdump -i lo0 -A -s 0 port 4318
+```
 
+- **Expected**: Both Node.js and Cloudflare Worker traces should appear in Grafana Tempo (accessible at `http://localhost:3000`). Navigate to the Tempo search screen to verify.
+- **Actual**: Both implementations reach the OTLP collector, but **only** Node.js traces appear in Grafana Tempo.
+
+### Objective
+
+Identify why the Cloudflare Worker OTLP traces, though sent successfully, fail to appear in Grafana.
